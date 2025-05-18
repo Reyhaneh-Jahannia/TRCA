@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحلیل تخصص استادان در دروس</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">تحلیل تخصص استادان در دروس</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>تنظیمات</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('update_config') }}" method="post">
+                            <div class="mb-3">
+                                <label for="courses" class="form-label">لیست دروس (هر درس در یک خط):</label>
+                                <textarea class="form-control" id="courses" name="courses" rows="10" dir="ltr">{{ '\n'.join(courses) }}</textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="scholar_ids" class="form-label">شناسه‌های Google Scholar (هر شناسه در یک خط):</label>
+                                <textarea class="form-control" id="scholar_ids" name="scholar_ids" rows="5" dir="ltr">{{ '\n'.join(scholar_ids) }}</textarea>
+                                <small class="form-text text-muted">شناسه‌ها را از URL پروفایل Google Scholar استخراج کنید. مثال: HChhDEwAAAAJ</small>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">ذخیره تنظیمات</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>اجرای تحلیل</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('analyze') }}" method="post">
+                            <div class="mb-3">
+                                <label for="method" class="form-label">روش محاسبه شباهت:</label>
+                                <select class="form-select" id="method" name="method">
+                                    <option value="sum">مجموع (Sum)</option>
+                                    <option value="mean">میانگین (Mean)</option>
+                                    <option value="max">حداکثر (Max)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <p>این فرآیند ممکن است چند دقیقه طول بکشد. لطفاً صبور باشید.</p>
+                                <p>اگر شناسه‌های جدید اضافه کرده‌اید، زمان بیشتری نیاز خواهد بود.</p>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success">شروع تحلیل</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h3>راهنما</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>این ابزار به شما کمک می‌کند تا تخصص استادان را در دروس مختلف بر اساس انتشارات آن‌ها در Google Scholar تحلیل کنید.</p>
+                        <ol>
+                            <li>لیست دروس و شناسه‌های Google Scholar را وارد کنید.</li>
+                            <li>تنظیمات را ذخیره کنید.</li>
+                            <li>روش محاسبه شباهت را انتخاب کنید و تحلیل را شروع کنید.</li>
+                            <li>نتایج به صورت نمودار حرارتی و فایل CSV نمایش داده می‌شوند.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
