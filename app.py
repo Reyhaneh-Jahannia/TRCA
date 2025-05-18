@@ -19,10 +19,12 @@ except Exception as e:
     logger.error(f"Error importing TC module: {str(e)}")
 
 # Initialize Flask with explicit template and static folders
+# در بخش تنظیمات اولیه Flask
 app = Flask(__name__, 
             template_folder=templates_dir,
             static_folder=static_dir)
-app.secret_key = 'your_secret_key'  # برای استفاده از flash messages
+# Use environment variable for secret key
+app.secret_key = os.environ.get('SECRET_KEY', 'a8f5f167f44f4964e6c998dee827110c')
 
 # مسیر ذخیره نتایج
 RESULTS_DIR = os.path.join(current_dir, "results")
@@ -158,6 +160,7 @@ def template_test():
     return render_template('test.html')
 
 # تغییر secret_key برای امنیت بیشتر
+# Remove or comment out this line since we've moved it above
 # app.secret_key = os.environ.get('SECRET_KEY', 'your_default_secret_key')
 
 if __name__ == '__main__':
