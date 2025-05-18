@@ -126,18 +126,31 @@ def analyze():
         config = load_config()
         method = request.form.get('method', 'sum')
         
-        # اجرای تحلیل
-        _, result_paths = run_analysis(
-            config['courses'], 
-            config['scholar_ids'], 
-            method=method,
-            output_dir=RESULTS_DIR
-        )
+        # Start a background task for analysis instead of blocking the request
+        # For now, we'll just set a lower timeout and optimize the process
+        import threading
         
-        flash('تحلیل با موفقیت انجام شد.', 'success')
-        return render_template('results.html', 
-                              result_paths=result_paths,
-                              method=method)
+        def run_analysis_task():
+            try:
+                _, result_paths = run_analysis(
+                    config['courses'], 
+                    config['scholar_ids'], 
+                    method=method,
+                    output_dir=RESULTS_DIR
+                )
+                # We can't use flash in a background thread
+                logger.info(f"Analysis completed successfully: {result_paths}")
+            except Exception as e:
+                logger.error(f"Background analysis error: {str(e)}")
+        
+        # Start the analysis in a background thread
+        thread = threading.Thread(target=run_analysis_task)
+        thread.daemon = True
+        thread.start()
+        
+        # Return immediately with a message
+        flash('تحلیل شروع شد. این فرآیند ممکن است چند دقیقه طول بکشد. لطفاً صبر کنید و صفحه را رفرش کنید.', 'info')
+        return redirect(url_for('index'))
         
     except Exception as e:
         flash(f'خطا در اجرای تحلیل: {str(e)}', 'error')
@@ -162,6 +175,49 @@ def template_test():
 # تغییر secret_key برای امنیت بیشتر
 # Remove or comment out this line since we've moved it above
 # app.secret_key = os.environ.get('SECRET_KEY', 'your_default_secret_key')
+
+# Add this new route after the run_analysis route
+
+@app.route('/check_results')
+def check_results():
+    """Check if results are available"""
+    try:
+        # Check if any result files exist
+        result_files = os.listdir(RESULTS_DIR)
+        png_files = [f for f in result_files if f.endswith('.png')]
+        
+        if png_files:
+            # Sort by modification time (newest first)
+            png_files.sort(key=lambda x: os.path.getmtime(os.path.join(RESULTS_DIR, x)), reverse=True)
+            latest_file = png_files[0]
+            
+            # Extract method from filename
+            method = "unknown"
+            if "_sum_" in latest_file:
+                method = "sum"
+            elif "_mean_" in latest_file:
+                method = "mean"
+            elif "_max_" in latest_file:
+                method = "max"
+            
+            # Construct result paths
+            base_name = latest_file.replace("_heatmap.png", "")
+            result_paths = {
+                'png': latest_file,
+                'pdf': base_name + "_heatmap.pdf",
+                'csv': base_name + ".csv"
+            }
+            
+            return render_template('results.html', 
+                                  result_paths=result_paths,
+                                  method=method)
+        else:
+            flash('هنوز نتیجه‌ای موجود نیست. لطفاً ابتدا تحلیل را اجرا کنید.', 'info')
+            return redirect(url_for('index'))
+            
+    except Exception as e:
+        flash(f'خطا در بررسی نتایج: {str(e)}', 'error')
+        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     logger.info("Starting Flask application")
