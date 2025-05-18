@@ -3,12 +3,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
-import seaborn as sns
-import matplotlib.pyplot as plt
-import pickle
 import logging
-from scholarly import scholarly
 import os
 import uuid
 
@@ -16,12 +11,40 @@ import uuid
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize scholarly
-scholarly.set_retries(5)
-logging.getLogger('scholarly').setLevel(logging.WARNING)
+# Try to import potentially problematic libraries with fallbacks
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    logger.warning("sentence_transformers not available. Some functionality will be limited.")
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+
+try:
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    VISUALIZATION_AVAILABLE = True
+except ImportError:
+    logger.warning("Visualization libraries not available. Visualization will be disabled.")
+    VISUALIZATION_AVAILABLE = False
+
+try:
+    import pickle
+    PICKLE_AVAILABLE = True
+except ImportError:
+    logger.warning("pickle not available. Caching will be disabled.")
+    PICKLE_AVAILABLE = False
+
+try:
+    from scholarly import scholarly
+    scholarly.set_retries(5)
+    logging.getLogger('scholarly').setLevel(logging.WARNING)
+    SCHOLARLY_AVAILABLE = True
+except ImportError:
+    logger.warning("scholarly not available. Google Scholar functionality will be limited.")
+    SCHOLARLY_AVAILABLE = False
 
 # Ensure cache directory exists
-CACHE_DIR = os.environ.get('CACHE_DIR', 'cache')
+CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 def clean_author_name(name):

@@ -119,10 +119,16 @@ def update_config():
         flash(f'خطا در ذخیره تنظیمات: {str(e)}', 'error')
         return redirect(url_for('index'))
 
+# In the analyze function, add a check for TC module availability
 @app.route('/run_analysis', methods=['POST'])
 def analyze():
     """Run the analysis"""
     try:
+        # Check if TC module is fully functional
+        if not hasattr(run_analysis, '__module__') or run_analysis.__module__ != 'TC':
+            flash('ماژول تحلیل به درستی بارگذاری نشده است. لطفاً با مدیر سیستم تماس بگیرید.', 'error')
+            return redirect(url_for('index'))
+            
         config = load_config()
         method = request.form.get('method', 'sum')
         
