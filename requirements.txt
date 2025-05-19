@@ -10,3 +10,4 @@ scholarly==1.7.11
 joblib==1.4.2
 transformers==4.51.3
 gunicorn==20.1.0
+hf_xet
