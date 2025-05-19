@@ -210,8 +210,40 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
             continue
             
         try:
-            pub_vectors = model.encode(data['pub_texts'], show_progress_bar=False)
-            author_results[name] = calculate_similarity(pub_vectors, course_embeddings, method)
+            # Process publications in smaller batches to reduce memory usage
+            batch_size = 10
+            pub_texts = data['pub_texts']
+            num_batches = (len(pub_texts) + batch_size - 1) // batch_size
+            
+            # Initialize result array
+            result = np.zeros(len(courses))
+            
+            for b in range(num_batches):
+                start_idx = b * batch_size
+                end_idx = min((b + 1) * batch_size, len(pub_texts))
+                batch_texts = pub_texts[start_idx:end_idx]
+                
+                # Encode batch
+                batch_vectors = model.encode(batch_texts, show_progress_bar=False)
+                
+                # Calculate similarity for batch
+                batch_similarity = calculate_similarity(batch_vectors, course_embeddings, method)
+                
+                # Accumulate results based on method
+                if method == 'sum':
+                    result += batch_similarity
+                elif method == 'max':
+                    result = np.maximum(result, batch_similarity)
+                elif method == 'mean':
+                    # For mean, we'll accumulate and then divide by total count at the end
+                    result += batch_similarity * len(batch_texts)
+            
+            # For mean method, divide by total count
+            if method == 'mean' and len(pub_texts) > 0:
+                result /= len(pub_texts)
+                
+            author_results[name] = result
+            
         except Exception as e:
             logger.error(f"Error calculating similarity for {name}: {str(e)}")
             author_results[name] = np.zeros(len(courses))

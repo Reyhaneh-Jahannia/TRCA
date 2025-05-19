@@ -197,19 +197,6 @@ def analyze():
                         logger.error(f"Error updating status file: {str(e)}")
                 
                 # Run the analysis with progress tracking
-                # Add a timeout to prevent hanging
-                import signal
-                
-                class TimeoutException(Exception):
-                    pass
-                
-                def timeout_handler(signum, frame):
-                    raise TimeoutException("Analysis timed out")
-                
-                # Set a timeout for the analysis (10 minutes)
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(600)
-                
                 try:
                     # Run the analysis with progress tracking
                     _, result_paths = run_analysis(
@@ -219,9 +206,6 @@ def analyze():
                         output_dir=RESULTS_DIR,
                         progress_callback=progress_callback
                     )
-                    
-                    # Cancel the timeout
-                    signal.alarm(0)
                     
                     # Update status to completed
                     status = {
@@ -241,15 +225,17 @@ def analyze():
                     
                     logger.info(f"Analysis completed successfully: {result_paths}")
                     
-                except TimeoutException:
-                    logger.error("Analysis timed out after 10 minutes")
+                except Exception as e:
+                    logger.error(f"Error during analysis: {str(e)}")
+                    logger.error(traceback.format_exc())
                     status = {
                         "status": "error",
                         "start_time": datetime.now().isoformat(),
                         "end_time": datetime.now().isoformat(),
                         "method": method,
-                        "error": "Analysis timed out after 10 minutes",
-                        "debug_info": "Analysis timed out"
+                        "error": str(e),
+                        "traceback": traceback.format_exc(),
+                        "debug_info": f"Error during analysis: {str(e)}"
                     }
                     with open(status_file, 'w') as f:
                         json.dump(status, f)
