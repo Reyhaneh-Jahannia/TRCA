@@ -140,9 +140,11 @@ def download_and_save_model():
     
     try:
         logger.info(f"Downloading model to {model_path}")
-        model = SentenceTransformer(model_name)
+        # First download to temporary location
+        temp_model = SentenceTransformer(model_name)
+        # Save to our specific path
         os.makedirs(model_path, exist_ok=True)
-        model.save(model_path)
+        temp_model.save(model_path)
         logger.info("Model saved successfully")
         return model_path
     except Exception as e:
@@ -158,6 +160,7 @@ def initialize_model():
         
         if os.path.exists(os.path.join(model_path, 'pytorch_model.bin')):
             logger.info(f"Loading model from local path: {model_path}")
+            # Load directly from saved path
             model = SentenceTransformer(model_path)
         else:
             logger.info("Model not found locally, downloading...")
