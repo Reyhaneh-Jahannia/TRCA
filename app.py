@@ -120,6 +120,11 @@ def update_config():
         return redirect(url_for('index'))
 
 # In the analyze function, add a check for TC module availability
+# Add this after the imports
+import time
+import traceback
+from datetime import datetime
+
 @app.route('/run_analysis', methods=['POST'])
 def analyze():
     """Run the analysis"""
@@ -138,12 +143,16 @@ def analyze():
             "status": "started",
             "start_time": datetime.now().isoformat(),
             "method": method,
+            "progress": 0,
+            "total_scholars": len(config['scholar_ids']),
+            "current_scholar": 0,
+            "current_scholar_id": "",
             "error": None
         }
         with open(status_file, 'w') as f:
             json.dump(status, f)
         
-        # Start a background task for analysis instead of blocking the request
+        # Start a background task for analysis
         import threading
         
         def run_analysis_task():
@@ -157,17 +166,32 @@ def analyze():
                     "status": "running",
                     "start_time": datetime.now().isoformat(),
                     "method": method,
+                    "progress": 0,
+                    "total_scholars": len(config['scholar_ids']),
+                    "current_scholar": 0,
+                    "current_scholar_id": "",
                     "error": None
                 }
                 with open(status_file, 'w') as f:
                     json.dump(status, f)
                 
-                # Run the analysis
+                # Create a progress callback function
+                def progress_callback(scholar_index, scholar_id):
+                    nonlocal status
+                    status["current_scholar"] = scholar_index + 1
+                    status["current_scholar_id"] = scholar_id
+                    status["progress"] = int((scholar_index + 1) / len(config['scholar_ids']) * 100)
+                    with open(status_file, 'w') as f:
+                        json.dump(status, f)
+                    logger.info(f"Progress: {status['progress']}% - Processing scholar {scholar_index + 1}/{len(config['scholar_ids'])}: {scholar_id}")
+                
+                # Run the analysis with progress tracking
                 _, result_paths = run_analysis(
                     config['courses'], 
                     config['scholar_ids'], 
                     method=method,
-                    output_dir=RESULTS_DIR
+                    output_dir=RESULTS_DIR,
+                    progress_callback=progress_callback
                 )
                 
                 # Update status to completed
@@ -176,6 +200,9 @@ def analyze():
                     "start_time": datetime.now().isoformat(),
                     "end_time": datetime.now().isoformat(),
                     "method": method,
+                    "progress": 100,
+                    "total_scholars": len(config['scholar_ids']),
+                    "current_scholar": len(config['scholar_ids']),
                     "result_paths": result_paths,
                     "error": None
                 }

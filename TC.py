@@ -133,8 +133,40 @@ def visualize_results(df, output_prefix="course_expertise", output_dir="results"
     plt.close()
     return result_paths
 
-def run_analysis(courses, scholar_ids, method='sum', output_dir="results"):
-    """Run the analysis with the given courses and scholar IDs"""
+def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progress_callback=None):
+    """
+    Run the analysis for the given courses and scholar IDs.
+    
+    Args:
+        courses (list): List of course names
+        scholar_ids (list): List of Google Scholar IDs
+        method (str): Aggregation method ('sum', 'mean', or 'max')
+        output_dir (str): Directory to save results
+        progress_callback (callable): Function to call with progress updates
+        
+    Returns:
+        tuple: (DataFrame of similarities, dict of result file paths)
+    """
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate a unique ID for this run
+    run_id = str(uuid.uuid4())[:8]
+    
+    # Get embeddings for courses
+    course_embeddings = get_embeddings(courses)
+    
+    # Get publications for each scholar
+    all_publications = []
+    
+    for i, scholar_id in enumerate(scholar_ids):
+        # Call progress callback if provided
+        if progress_callback:
+            progress_callback(i, scholar_id)
+            
+        publications = get_scholar_publications(scholar_id)
+        all_publications.extend(publications)
+    
     # Initialize model
     model = SentenceTransformer('allenai-specter')
     
