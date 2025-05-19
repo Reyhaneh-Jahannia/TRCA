@@ -211,7 +211,7 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
             
         try:
             # Process publications in smaller batches to reduce memory usage
-            batch_size = 10
+            batch_size = 5
             pub_texts = data['pub_texts']
             num_batches = (len(pub_texts) + batch_size - 1) // batch_size
             
