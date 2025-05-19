@@ -162,12 +162,14 @@ def download_and_save_model():
     """Download and save the model to local directory"""
     model_name = 'paraphrase-albert-small-v2'
     model_path = os.path.join(os.path.dirname(__file__), 'models', model_name)
+    cache_dir = os.path.join(os.path.dirname(__file__), 'models', '.cache')
     
     try:
         logger.info(f"Downloading model to {model_path}")
-        # First download to temporary location
-        temp_model = SentenceTransformer(model_name)
-        # Save to our specific path
+        # Explicitly set cache_folder and use_auth_token=False
+        temp_model = SentenceTransformer(model_name, 
+                                       cache_folder=cache_dir,
+                                       use_auth_token=False)
         os.makedirs(model_path, exist_ok=True)
         temp_model.save(model_path)
         logger.info("Model saved successfully")
@@ -183,15 +185,18 @@ def initialize_model():
         model_name = 'paraphrase-albert-small-v2'
         model_path = os.path.join(os.path.dirname(__file__), 'models', model_name)
         
-        if os.path.exists(os.path.join(model_path, 'pytorch_model.bin')):
-            logger.info(f"Loading model from local path: {model_path}")
-            # Load directly from saved path
+        # First try to load from the models directory in git
+        if os.path.exists(os.path.join(model_path, 'model.safetensors')):
+            logger.info(f"Loading model from git repository: {model_path}")
             model = SentenceTransformer(model_path)
-        else:
-            logger.info("Model not found locally, downloading...")
-            model_path = download_and_save_model()
-            model = SentenceTransformer(model_path)
+            logger.info("Model loaded successfully from git repository")
+            return model
             
+        # If not found in git, try downloading
+        logger.info("Model not found in git repository, downloading...")
+        model_path = download_and_save_model()
+        model = SentenceTransformer(model_path)
+        
         logger.info("Model initialized successfully")
         return model
     except Exception as e:
