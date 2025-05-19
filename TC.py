@@ -133,8 +133,6 @@ def visualize_results(df, output_prefix="course_expertise", output_dir="results"
     plt.close()
     return result_paths
 
-# Update your run_analysis function to include the progress_callback parameter
-
 def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progress_callback=None):
     """
     Run the analysis for the given courses and scholar IDs.
@@ -155,41 +153,53 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
     # Generate a unique ID for this run
     run_id = str(uuid.uuid4())[:8]
     
+    # Initialize model early to check if it loads correctly
+    try:
+        logger.info("Initializing sentence transformer model")
+        model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+        logger.info("Model initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing model: {str(e)}")
+        raise
+    
     # Get embeddings for courses
-    course_embeddings = get_embeddings(courses)
+    try:
+        logger.info(f"Getting embeddings for {len(courses)} courses")
+        course_embeddings = model.encode(courses, show_progress_bar=False)
+        logger.info(f"Course embeddings shape: {course_embeddings.shape}")
+    except Exception as e:
+        logger.error(f"Error getting course embeddings: {str(e)}")
+        raise
     
-    # Get publications for each scholar
-    all_publications = []
-    
-    for i, scholar_id in enumerate(scholar_ids):
-        # Call progress callback if provided
-        if progress_callback:
-            progress_callback(i, scholar_id)
-            
-        publications = get_scholar_publications(scholar_id)
-        all_publications.extend(publications)
-    
-    # Initialize model - update to use the same model as get_embeddings
-    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-    
-    # Step 1: Fetch and process author data
-    logger.info("Fetching author data...")
-    results = Parallel(n_jobs=1)(delayed(get_author_data)(sid) for sid in scholar_ids)
-    
+    # Process each scholar individually to better track progress
     all_authors_data = {}
     last_names = {}
     
-    for name, _, pub_texts in results:
-        if not name.startswith("Error_"):
-            clean_name, last_name = clean_author_name(name)
-            all_authors_data[clean_name] = {'pub_texts': pub_texts}
-            last_names[clean_name] = last_name
+    for i, scholar_id in enumerate(scholar_ids):
+        try:
+            # Call progress callback if provided
+            if progress_callback:
+                progress_callback(i, scholar_id)
+            
+            logger.info(f"Processing scholar {i+1}/{len(scholar_ids)}: {scholar_id}")
+            
+            # Get author data
+            name, _, pub_texts = get_author_data(scholar_id)
+            
+            if not name.startswith("Error_"):
+                clean_name, last_name = clean_author_name(name)
+                all_authors_data[clean_name] = {'pub_texts': pub_texts}
+                last_names[clean_name] = last_name
+                logger.info(f"Successfully processed {clean_name} with {len(pub_texts)} publications")
+            else:
+                logger.warning(f"Error processing scholar {scholar_id}")
+                
+        except Exception as e:
+            logger.error(f"Error processing scholar {scholar_id}: {str(e)}")
+            # Continue with next scholar instead of failing completely
+            continue
     
-    # Step 2: Process courses
-    logger.info(f"Encoding {len(courses)} courses...")
-    course_vectors = model.encode(courses)
-    
-    # Step 3: Calculate expertise
+    # Calculate expertise scores
     logger.info(f"Calculating expertise scores (method: {method})...")
     author_results = {}
     
@@ -199,8 +209,12 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
             author_results[name] = np.zeros(len(courses))
             continue
             
-        pub_vectors = model.encode(data['pub_texts'])
-        author_results[name] = calculate_similarity(pub_vectors, course_vectors, method)
+        try:
+            pub_vectors = model.encode(data['pub_texts'], show_progress_bar=False)
+            author_results[name] = calculate_similarity(pub_vectors, course_embeddings, method)
+        except Exception as e:
+            logger.error(f"Error calculating similarity for {name}: {str(e)}")
+            author_results[name] = np.zeros(len(courses))
     
     # Create and sort results dataframe
     similarity_df = pd.DataFrame.from_dict(author_results,
@@ -208,9 +222,6 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
                                         columns=courses)
     similarity_df['Last_Name'] = similarity_df.index.map(last_names)
     similarity_df.sort_values('Last_Name', inplace=True)
-    
-    # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
     
     # Generate unique filename
     unique_id = str(uuid.uuid4())[:8]
@@ -222,8 +233,16 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
     logger.info(f"Results saved to {output_csv}")
     
     # Visualize
-    result_paths = visualize_results(similarity_df.drop('Last_Name', axis=1), 
-                    f"course_expertise_{method}", output_dir)
+    try:
+        result_paths = visualize_results(similarity_df.drop('Last_Name', axis=1), 
+                        f"course_expertise_{method}", output_dir)
+        logger.info(f"Visualization saved: {result_paths}")
+    except Exception as e:
+        logger.error(f"Error creating visualization: {str(e)}")
+        # Create a minimal result paths dict if visualization fails
+        result_paths = {
+            'csv': f"{output_prefix}.csv"
+        }
     
     return similarity_df.drop('Last_Name', axis=1), result_paths
 
@@ -267,78 +286,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     main(method=args.method)
-
-
-# Add this function if it's missing from your TC.py file
-
-def get_embeddings(texts, model=None):
-    """
-    Get embeddings for a list of texts using a sentence transformer model.
-    
-    Args:
-        texts (list): List of text strings to embed
-        model: Optional pre-loaded model. If None, a model will be loaded.
-        
-    Returns:
-        numpy.ndarray: Array of embeddings
-    """
-    logger.info(f"Getting embeddings for {len(texts)} texts")
-    
-    # Load model if not provided
-    if model is None:
-        if not SENTENCE_TRANSFORMERS_AVAILABLE:
-            logger.error("sentence_transformers library not available")
-            raise ImportError("sentence_transformers library is required for embeddings")
-            
-        try:
-            # Use the model you've been using
-            model_name = "paraphrase-multilingual-MiniLM-L12-v2"
-            logger.info(f"Loading model: {model_name}")
-            model = SentenceTransformer(model_name)
-        except Exception as e:
-            logger.error(f"Error loading model: {str(e)}")
-            raise
-    
-    # Get embeddings
-    try:
-        embeddings = model.encode(texts, show_progress_bar=False)
-        logger.info(f"Generated embeddings with shape: {embeddings.shape}")
-        return embeddings
-    except Exception as e:
-        logger.error(f"Error generating embeddings: {str(e)}")
-        raise
-
-
-def get_scholar_publications(scholar_id):
-    """
-    Get publications for a Google Scholar ID.
-    
-    Args:
-        scholar_id (str): Google Scholar ID
-        
-    Returns:
-        list: List of publication titles
-    """
-    logger.info(f"Getting publications for scholar: {scholar_id}")
-    
-    if not SCHOLARLY_AVAILABLE:
-        logger.error("scholarly library not available")
-        raise ImportError("scholarly library is required to get publications")
-    
-    try:
-        # Get author data
-        author = scholarly.search_author_id(scholar_id)
-        author = scholarly.fill(author)
-        
-        # Extract publication titles
-        publications = []
-        for pub in author['publications']:
-            if 'title' in pub and pub['title']:
-                publications.append(pub['title'])
-        
-        logger.info(f"Found {len(publications)} publications for {scholar_id}")
-        return publications
-    except Exception as e:
-        logger.error(f"Error getting publications for {scholar_id}: {str(e)}")
-        # Return empty list instead of raising to continue with other scholars
-        return []

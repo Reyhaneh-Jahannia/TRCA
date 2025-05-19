@@ -147,8 +147,13 @@ def analyze():
             "total_scholars": len(config['scholar_ids']),
             "current_scholar": 0,
             "current_scholar_id": "",
-            "error": None
+            "error": None,
+            "debug_info": "Analysis starting"
         }
+        
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(status_file), exist_ok=True)
+        
         with open(status_file, 'w') as f:
             json.dump(status, f)
         
@@ -170,7 +175,8 @@ def analyze():
                     "total_scholars": len(config['scholar_ids']),
                     "current_scholar": 0,
                     "current_scholar_id": "",
-                    "error": None
+                    "error": None,
+                    "debug_info": "Analysis running"
                 }
                 with open(status_file, 'w') as f:
                     json.dump(status, f)
@@ -181,35 +187,73 @@ def analyze():
                     status["current_scholar"] = scholar_index + 1
                     status["current_scholar_id"] = scholar_id
                     status["progress"] = int((scholar_index + 1) / len(config['scholar_ids']) * 100)
-                    with open(status_file, 'w') as f:
-                        json.dump(status, f)
-                    logger.info(f"Progress: {status['progress']}% - Processing scholar {scholar_index + 1}/{len(config['scholar_ids'])}: {scholar_id}")
+                    status["debug_info"] = f"Processing scholar {scholar_index + 1}/{len(config['scholar_ids'])}: {scholar_id}"
+                    
+                    try:
+                        with open(status_file, 'w') as f:
+                            json.dump(status, f)
+                        logger.info(f"Progress: {status['progress']}% - Processing scholar {scholar_index + 1}/{len(config['scholar_ids'])}: {scholar_id}")
+                    except Exception as e:
+                        logger.error(f"Error updating status file: {str(e)}")
                 
                 # Run the analysis with progress tracking
-                _, result_paths = run_analysis(
-                    config['courses'], 
-                    config['scholar_ids'], 
-                    method=method,
-                    output_dir=RESULTS_DIR,
-                    progress_callback=progress_callback
-                )
+                # Add a timeout to prevent hanging
+                import signal
                 
-                # Update status to completed
-                status = {
-                    "status": "completed",
-                    "start_time": datetime.now().isoformat(),
-                    "end_time": datetime.now().isoformat(),
-                    "method": method,
-                    "progress": 100,
-                    "total_scholars": len(config['scholar_ids']),
-                    "current_scholar": len(config['scholar_ids']),
-                    "result_paths": result_paths,
-                    "error": None
-                }
-                with open(status_file, 'w') as f:
-                    json.dump(status, f)
+                class TimeoutException(Exception):
+                    pass
                 
-                logger.info(f"Analysis completed successfully: {result_paths}")
+                def timeout_handler(signum, frame):
+                    raise TimeoutException("Analysis timed out")
+                
+                # Set a timeout for the analysis (10 minutes)
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(600)
+                
+                try:
+                    # Run the analysis with progress tracking
+                    _, result_paths = run_analysis(
+                        config['courses'], 
+                        config['scholar_ids'], 
+                        method=method,
+                        output_dir=RESULTS_DIR,
+                        progress_callback=progress_callback
+                    )
+                    
+                    # Cancel the timeout
+                    signal.alarm(0)
+                    
+                    # Update status to completed
+                    status = {
+                        "status": "completed",
+                        "start_time": datetime.now().isoformat(),
+                        "end_time": datetime.now().isoformat(),
+                        "method": method,
+                        "progress": 100,
+                        "total_scholars": len(config['scholar_ids']),
+                        "current_scholar": len(config['scholar_ids']),
+                        "result_paths": result_paths,
+                        "error": None,
+                        "debug_info": "Analysis completed successfully"
+                    }
+                    with open(status_file, 'w') as f:
+                        json.dump(status, f)
+                    
+                    logger.info(f"Analysis completed successfully: {result_paths}")
+                    
+                except TimeoutException:
+                    logger.error("Analysis timed out after 10 minutes")
+                    status = {
+                        "status": "error",
+                        "start_time": datetime.now().isoformat(),
+                        "end_time": datetime.now().isoformat(),
+                        "method": method,
+                        "error": "Analysis timed out after 10 minutes",
+                        "debug_info": "Analysis timed out"
+                    }
+                    with open(status_file, 'w') as f:
+                        json.dump(status, f)
+                
             except Exception as e:
                 logger.error(f"Background analysis error: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -221,7 +265,8 @@ def analyze():
                     "end_time": datetime.now().isoformat(),
                     "method": method,
                     "error": str(e),
-                    "traceback": traceback.format_exc()
+                    "traceback": traceback.format_exc(),
+                    "debug_info": f"Error: {str(e)}"
                 }
                 with open(status_file, 'w') as f:
                     json.dump(status, f)
