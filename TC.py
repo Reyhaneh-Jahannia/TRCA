@@ -234,13 +234,13 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
                     result += batch_similarity
                 elif method == 'max':
                     result = np.maximum(result, batch_similarity)
-                elif method == 'mean':
-                    # For mean, we'll accumulate and then divide by total count at the end
-                    result += batch_similarity * len(batch_texts)
+                # elif method == 'mean':
+                #     # For mean, we'll accumulate and then divide by total count at the end
+                #     result += batch_similarity * len(batch_texts)
             
-            # For mean method, divide by total count
-            if method == 'mean' and len(pub_texts) > 0:
-                result /= len(pub_texts)
+            # # For mean method, divide by total count
+            # if method == 'mean' and len(pub_texts) > 0:
+            #     result /= len(pub_texts)
                 
             author_results[name] = result
             

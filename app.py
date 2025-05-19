@@ -335,10 +335,10 @@ def check_results():
             method = "unknown"
             if "_sum_" in latest_file:
                 method = "sum"
-            elif "_mean_" in latest_file:
-                method = "mean"
             elif "_max_" in latest_file:
                 method = "max"
+            # elif "_mean_" in latest_file:
+            #     method = "mean"
             
             # Construct result paths
             base_name = latest_file.replace("_heatmap.png", "")
