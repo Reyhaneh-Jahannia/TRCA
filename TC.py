@@ -133,6 +133,8 @@ def visualize_results(df, output_prefix="course_expertise", output_dir="results"
     plt.close()
     return result_paths
 
+# Update your run_analysis function to include the progress_callback parameter
+
 def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progress_callback=None):
     """
     Run the analysis for the given courses and scholar IDs.
@@ -167,8 +169,8 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
         publications = get_scholar_publications(scholar_id)
         all_publications.extend(publications)
     
-    # Initialize model
-    model = SentenceTransformer('allenai-specter')
+    # Initialize model - update to use the same model as get_embeddings
+    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
     
     # Step 1: Fetch and process author data
     logger.info("Fetching author data...")
@@ -265,3 +267,78 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     main(method=args.method)
+
+
+# Add this function if it's missing from your TC.py file
+
+def get_embeddings(texts, model=None):
+    """
+    Get embeddings for a list of texts using a sentence transformer model.
+    
+    Args:
+        texts (list): List of text strings to embed
+        model: Optional pre-loaded model. If None, a model will be loaded.
+        
+    Returns:
+        numpy.ndarray: Array of embeddings
+    """
+    logger.info(f"Getting embeddings for {len(texts)} texts")
+    
+    # Load model if not provided
+    if model is None:
+        if not SENTENCE_TRANSFORMERS_AVAILABLE:
+            logger.error("sentence_transformers library not available")
+            raise ImportError("sentence_transformers library is required for embeddings")
+            
+        try:
+            # Use the model you've been using
+            model_name = "paraphrase-multilingual-MiniLM-L12-v2"
+            logger.info(f"Loading model: {model_name}")
+            model = SentenceTransformer(model_name)
+        except Exception as e:
+            logger.error(f"Error loading model: {str(e)}")
+            raise
+    
+    # Get embeddings
+    try:
+        embeddings = model.encode(texts, show_progress_bar=False)
+        logger.info(f"Generated embeddings with shape: {embeddings.shape}")
+        return embeddings
+    except Exception as e:
+        logger.error(f"Error generating embeddings: {str(e)}")
+        raise
+
+
+def get_scholar_publications(scholar_id):
+    """
+    Get publications for a Google Scholar ID.
+    
+    Args:
+        scholar_id (str): Google Scholar ID
+        
+    Returns:
+        list: List of publication titles
+    """
+    logger.info(f"Getting publications for scholar: {scholar_id}")
+    
+    if not SCHOLARLY_AVAILABLE:
+        logger.error("scholarly library not available")
+        raise ImportError("scholarly library is required to get publications")
+    
+    try:
+        # Get author data
+        author = scholarly.search_author_id(scholar_id)
+        author = scholarly.fill(author)
+        
+        # Extract publication titles
+        publications = []
+        for pub in author['publications']:
+            if 'title' in pub and pub['title']:
+                publications.append(pub['title'])
+        
+        logger.info(f"Found {len(publications)} publications for {scholar_id}")
+        return publications
+    except Exception as e:
+        logger.error(f"Error getting publications for {scholar_id}: {str(e)}")
+        # Return empty list instead of raising to continue with other scholars
+        return []
