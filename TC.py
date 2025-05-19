@@ -6,10 +6,35 @@ from sklearn.metrics.pairwise import cosine_similarity
 import logging
 import os
 import uuid
+import shutil
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Define model paths
+MODEL_NAME = 'paraphrase-albert-small-v2'
+LOCAL_MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', MODEL_NAME)
+RENDER_MODEL_PATH = '/opt/render/project/src/models/paraphrase-albert-small-v2'
+
+def copy_model_to_render():
+    """Copy model files to render path if running in render environment"""
+    try:
+        if os.path.exists('/opt/render'):  # Check if running in render
+            logger.info("Running in render environment, copying model files...")
+            if os.path.exists(LOCAL_MODEL_PATH):
+                os.makedirs(os.path.dirname(RENDER_MODEL_PATH), exist_ok=True)
+                if os.path.exists(RENDER_MODEL_PATH):
+                    shutil.rmtree(RENDER_MODEL_PATH)
+                shutil.copytree(LOCAL_MODEL_PATH, RENDER_MODEL_PATH)
+                logger.info(f"Model files copied to {RENDER_MODEL_PATH}")
+            else:
+                logger.error(f"Local model not found at {LOCAL_MODEL_PATH}")
+    except Exception as e:
+        logger.error(f"Error copying model files: {str(e)}")
+
+# Add model copy at the start of imports
+copy_model_to_render()
 
 # Try to import potentially problematic libraries with fallbacks
 try:
