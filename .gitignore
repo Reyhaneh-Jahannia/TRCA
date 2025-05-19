@@ -24,4 +24,4 @@ ENV/
 Thumbs.db
 
 # Models
-models/paraphrase-albert-small-v2/models--sentence-transformers--paraphrase-albert-small-v2/snapshots
+models/paraphrase-albert-small-v2

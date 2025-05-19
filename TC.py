@@ -133,6 +133,43 @@ def visualize_results(df, output_prefix="course_expertise", output_dir="results"
     plt.close()
     return result_paths
 
+def download_and_save_model():
+    """Download and save the model to local directory"""
+    model_name = 'paraphrase-albert-small-v2'
+    model_path = os.path.join(os.path.dirname(__file__), 'models', model_name)
+    
+    try:
+        logger.info(f"Downloading model to {model_path}")
+        model = SentenceTransformer(model_name)
+        os.makedirs(model_path, exist_ok=True)
+        model.save(model_path)
+        logger.info("Model saved successfully")
+        return model_path
+    except Exception as e:
+        logger.error(f"Error downloading model: {str(e)}")
+        raise
+
+def initialize_model():
+    """Initialize the sentence transformer model"""
+    try:
+        logger.info("Initializing sentence transformer model")
+        model_name = 'paraphrase-albert-small-v2'
+        model_path = os.path.join(os.path.dirname(__file__), 'models', model_name)
+        
+        if os.path.exists(os.path.join(model_path, 'pytorch_model.bin')):
+            logger.info(f"Loading model from local path: {model_path}")
+            model = SentenceTransformer(model_path)
+        else:
+            logger.info("Model not found locally, downloading...")
+            model_path = download_and_save_model()
+            model = SentenceTransformer(model_path)
+            
+        logger.info("Model initialized successfully")
+        return model
+    except Exception as e:
+        logger.error(f"Error initializing model: {str(e)}")
+        raise
+
 def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progress_callback=None):
     """
     Run the analysis for the given courses and scholar IDs.
@@ -154,26 +191,6 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
     run_id = str(uuid.uuid4())[:8]
     
     # Initialize model early to check if it loads correctly
-    def initialize_model():
-        try:
-            logger.info("Initializing sentence transformer model")
-            model_path = os.path.join(os.path.dirname(__file__), 'models', 'paraphrase-albert-small-v2')
-            
-            if os.path.exists(model_path):
-                logger.info(f"Loading model from local path: {model_path}")
-                model = SentenceTransformer(model_path)
-            else:
-                logger.info("Downloading model and saving to local path")
-                os.makedirs(model_path, exist_ok=True)
-                model = SentenceTransformer('paraphrase-albert-small-v2', cache_folder=model_path)
-                
-            logger.info("Model initialized successfully")
-            return model
-        except Exception as e:
-            logger.error(f"Error initializing model: {str(e)}")
-            raise
-    
-    # در تابع run_analysis، جایگزین کردن خط مربوط به model:
     try:
         model = initialize_model()
         logger.info("Model initialized successfully")
@@ -327,6 +344,9 @@ def main(method='sum'):
     run_analysis(COURSES, scholar_ids, method)
 
 if __name__ == "__main__":
+    # Add this line before the argument parser to download model if needed
+    download_and_save_model()
+    
     import argparse
     import os    
     # Set up command line arguments
