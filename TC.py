@@ -156,7 +156,10 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
     # Initialize model early to check if it loads correctly
     try:
         logger.info("Initializing sentence transformer model")
-        model = SentenceTransformer('paraphrase-MiniLM-L3-v2') #paraphrase-multilingual-MiniLM-L12-v2
+        # model = SentenceTransformer('paraphrase-MiniLM-L3-v2') #paraphrase-multilingual-MiniLM-L12-v2
+        model = SentenceTransformer('paraphrase-MiniLM-L3-v2', 
+                                device='cpu',
+                                cache_folder='/tmp/models')
         logger.info("Model initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing model: {str(e)}")
@@ -309,7 +312,7 @@ def main(method='sum'):
 
 if __name__ == "__main__":
     import argparse
-    
+    import os    
     # Set up command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--method', type=str, default='sum',
@@ -317,4 +320,11 @@ if __name__ == "__main__":
                       help="Similarity calculation method (sum/mean/max)")
     args = parser.parse_args()
     
+    os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
+    os.environ['HF_HUB_DOWNLOAD_TIMEOUT'] = '600'  # 10 دقیقه
+
+    model = SentenceTransformer('paraphrase-MiniLM-L3-v2', 
+                            device='cpu',
+                            cache_folder='/tmp/models')
+
     main(method=args.method)
