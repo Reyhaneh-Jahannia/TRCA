@@ -132,22 +132,72 @@ def analyze():
         config = load_config()
         method = request.form.get('method', 'sum')
         
+        # Create a status file to track progress
+        status_file = os.path.join(RESULTS_DIR, "analysis_status.json")
+        status = {
+            "status": "started",
+            "start_time": datetime.now().isoformat(),
+            "method": method,
+            "error": None
+        }
+        with open(status_file, 'w') as f:
+            json.dump(status, f)
+        
         # Start a background task for analysis instead of blocking the request
-        # For now, we'll just set a lower timeout and optimize the process
         import threading
         
         def run_analysis_task():
             try:
+                logger.info(f"Starting analysis with method: {method}")
+                logger.info(f"Courses: {config['courses']}")
+                logger.info(f"Scholar IDs: {config['scholar_ids']}")
+                
+                # Update status to running
+                status = {
+                    "status": "running",
+                    "start_time": datetime.now().isoformat(),
+                    "method": method,
+                    "error": None
+                }
+                with open(status_file, 'w') as f:
+                    json.dump(status, f)
+                
+                # Run the analysis
                 _, result_paths = run_analysis(
                     config['courses'], 
                     config['scholar_ids'], 
                     method=method,
                     output_dir=RESULTS_DIR
                 )
-                # We can't use flash in a background thread
+                
+                # Update status to completed
+                status = {
+                    "status": "completed",
+                    "start_time": datetime.now().isoformat(),
+                    "end_time": datetime.now().isoformat(),
+                    "method": method,
+                    "result_paths": result_paths,
+                    "error": None
+                }
+                with open(status_file, 'w') as f:
+                    json.dump(status, f)
+                
                 logger.info(f"Analysis completed successfully: {result_paths}")
             except Exception as e:
                 logger.error(f"Background analysis error: {str(e)}")
+                logger.error(traceback.format_exc())
+                
+                # Update status to error
+                status = {
+                    "status": "error",
+                    "start_time": datetime.now().isoformat(),
+                    "end_time": datetime.now().isoformat(),
+                    "method": method,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }
+                with open(status_file, 'w') as f:
+                    json.dump(status, f)
         
         # Start the analysis in a background thread
         thread = threading.Thread(target=run_analysis_task)
@@ -156,10 +206,90 @@ def analyze():
         
         # Return immediately with a message
         flash('تحلیل شروع شد. این فرآیند ممکن است چند دقیقه طول بکشد. لطفاً صبر کنید و صفحه را رفرش کنید.', 'info')
-        return redirect(url_for('index'))
+        return redirect(url_for('check_status'))
         
     except Exception as e:
+        logger.error(f"Error in analyze route: {str(e)}")
+        logger.error(traceback.format_exc())
         flash(f'خطا در اجرای تحلیل: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+# Add a new route to check analysis status
+@app.route('/check_status')
+def check_status():
+    """Check the status of the analysis"""
+    try:
+        status_file = os.path.join(RESULTS_DIR, "analysis_status.json")
+        
+        if os.path.exists(status_file):
+            with open(status_file, 'r') as f:
+                status = json.load(f)
+            
+            if status["status"] == "completed":
+                flash('تحلیل با موفقیت انجام شد.', 'success')
+                return redirect(url_for('check_results'))
+            elif status["status"] == "error":
+                flash(f'خطا در اجرای تحلیل: {status["error"]}', 'error')
+                return redirect(url_for('index'))
+            else:
+                # Still running
+                flash('تحلیل در حال اجرا است. لطفاً صبر کنید و صفحه را رفرش کنید.', 'info')
+                return render_template('status.html', status=status)
+        else:
+            flash('وضعیت تحلیل نامشخص است. لطفاً دوباره تلاش کنید.', 'warning')
+            return redirect(url_for('index'))
+            
+    except Exception as e:
+        logger.error(f"Error checking status: {str(e)}")
+        flash(f'خطا در بررسی وضعیت تحلیل: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/check_results')
+def check_results():
+    """Check if results are available"""
+    try:
+        # Check if any result files exist
+        result_files = os.listdir(RESULTS_DIR)
+        logger.debug(f"Files in results directory: {result_files}")
+        
+        png_files = [f for f in result_files if f.endswith('.png')]
+        logger.debug(f"PNG files found: {png_files}")
+        
+        if png_files:
+            # Sort by modification time (newest first)
+            png_files.sort(key=lambda x: os.path.getmtime(os.path.join(RESULTS_DIR, x)), reverse=True)
+            latest_file = png_files[0]
+            logger.debug(f"Latest PNG file: {latest_file}")
+            
+            # Extract method from filename
+            method = "unknown"
+            if "_sum_" in latest_file:
+                method = "sum"
+            elif "_mean_" in latest_file:
+                method = "mean"
+            elif "_max_" in latest_file:
+                method = "max"
+            
+            # Construct result paths
+            base_name = latest_file.replace("_heatmap.png", "")
+            result_paths = {
+                'png': latest_file,
+                'pdf': base_name + "_heatmap.pdf",
+                'csv': base_name + ".csv"
+            }
+            
+            logger.debug(f"Result paths: {result_paths}")
+            return render_template('results.html', 
+                                  result_paths=result_paths,
+                                  method=method)
+        else:
+            flash('هنوز نتیجه‌ای موجود نیست. لطفاً ابتدا تحلیل را اجرا کنید.', 'info')
+            return redirect(url_for('index'))
+            
+    except Exception as e:
+        logger.error(f"Error checking results: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash(f'خطا در بررسی نتایج: {str(e)}', 'error')
         return redirect(url_for('index'))
 
 @app.route('/results/<path:filename>')
@@ -181,49 +311,6 @@ def template_test():
 # تغییر secret_key برای امنیت بیشتر
 # Remove or comment out this line since we've moved it above
 # app.secret_key = os.environ.get('SECRET_KEY', 'your_default_secret_key')
-
-# Add this new route after the run_analysis route
-
-@app.route('/check_results')
-def check_results():
-    """Check if results are available"""
-    try:
-        # Check if any result files exist
-        result_files = os.listdir(RESULTS_DIR)
-        png_files = [f for f in result_files if f.endswith('.png')]
-        
-        if png_files:
-            # Sort by modification time (newest first)
-            png_files.sort(key=lambda x: os.path.getmtime(os.path.join(RESULTS_DIR, x)), reverse=True)
-            latest_file = png_files[0]
-            
-            # Extract method from filename
-            method = "unknown"
-            if "_sum_" in latest_file:
-                method = "sum"
-            elif "_mean_" in latest_file:
-                method = "mean"
-            elif "_max_" in latest_file:
-                method = "max"
-            
-            # Construct result paths
-            base_name = latest_file.replace("_heatmap.png", "")
-            result_paths = {
-                'png': latest_file,
-                'pdf': base_name + "_heatmap.pdf",
-                'csv': base_name + ".csv"
-            }
-            
-            return render_template('results.html', 
-                                  result_paths=result_paths,
-                                  method=method)
-        else:
-            flash('هنوز نتیجه‌ای موجود نیست. لطفاً ابتدا تحلیل را اجرا کنید.', 'info')
-            return redirect(url_for('index'))
-            
-    except Exception as e:
-        flash(f'خطا در بررسی نتایج: {str(e)}', 'error')
-        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     logger.info("Starting Flask application")
