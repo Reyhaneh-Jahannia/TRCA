@@ -242,6 +242,8 @@ def analyze():
         return redirect(url_for('index'))
 
 # Add a new route to check analysis status
+# Add these changes to your app.py file
+
 @app.route('/check_status')
 def check_status():
     """Check the status of the analysis"""
@@ -249,33 +251,43 @@ def check_status():
         status_file = os.path.join(RESULTS_DIR, "analysis_status.json")
         
         if os.path.exists(status_file):
-            with open(status_file, 'r') as f:
-                status = json.load(f)
-            
-            if status["status"] == "completed":
-                flash('تحلیل با موفقیت انجام شد.', 'success')
-                return redirect(url_for('check_results'))
-            elif status["status"] == "error":
-                flash(f'خطا در اجرای تحلیل: {status["error"]}', 'error')
-                return redirect(url_for('index'))
-            else:
-                # Still running
-                flash('تحلیل در حال اجرا است. لطفاً صبر کنید و صفحه را رفرش کنید.', 'info')
-                return render_template('status.html', status=status)
+            try:
+                with open(status_file, 'r') as f:
+                    status = json.load(f)
+                
+                if status["status"] == "completed":
+                    flash('تحلیل با موفقیت انجام شد.', 'success')
+                    return redirect(url_for('check_results'))
+                elif status["status"] == "error":
+                    flash(f'خطا در اجرای تحلیل: {status.get("error", "خطای نامشخص")}', 'error')
+                    return redirect(url_for('index'))
+                else:
+                    # Still running
+                    flash('تحلیل در حال اجرا است. لطفاً صبر کنید و صفحه را رفرش کنید.', 'info')
+                    return render_template('status.html', status=status)
+            except json.JSONDecodeError:
+                # Handle corrupted status file
+                logger.error("Status file is corrupted")
+                return render_template('status.html', status={})
         else:
-            flash('وضعیت تحلیل نامشخص است. لطفاً دوباره تلاش کنید.', 'warning')
-            return redirect(url_for('index'))
+            # No status file yet, but analysis might be starting
+            return render_template('status.html', status={})
             
     except Exception as e:
         logger.error(f"Error checking status: {str(e)}")
-        flash(f'خطا در بررسی وضعیت تحلیل: {str(e)}', 'error')
-        return redirect(url_for('index'))
+        logger.error(traceback.format_exc())
+        # Return a minimal status page instead of redirecting
+        return render_template('status.html', status={})
 
 @app.route('/check_results')
 def check_results():
     """Check if results are available"""
     try:
         # Check if any result files exist
+        if not os.path.exists(RESULTS_DIR):
+            flash('پوشه نتایج وجود ندارد.', 'error')
+            return redirect(url_for('index'))
+            
         result_files = os.listdir(RESULTS_DIR)
         logger.debug(f"Files in results directory: {result_files}")
         
@@ -300,10 +312,17 @@ def check_results():
             # Construct result paths
             base_name = latest_file.replace("_heatmap.png", "")
             result_paths = {
-                'png': latest_file,
-                'pdf': base_name + "_heatmap.pdf",
-                'csv': base_name + ".csv"
+                'png': latest_file
             }
+            
+            # Only add files that actually exist
+            pdf_file = base_name + "_heatmap.pdf"
+            if pdf_file in result_files:
+                result_paths['pdf'] = pdf_file
+                
+            csv_file = base_name + ".csv"
+            if csv_file in result_files:
+                result_paths['csv'] = csv_file
             
             logger.debug(f"Result paths: {result_paths}")
             return render_template('results.html', 
