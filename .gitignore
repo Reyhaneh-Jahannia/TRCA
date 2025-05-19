@@ -22,3 +22,6 @@ ENV/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Models
+models/paraphrase-albert-small-v2/models--sentence-transformers--paraphrase-albert-small-v2/snapshots

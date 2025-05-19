@@ -154,12 +154,28 @@ def run_analysis(courses, scholar_ids, method='sum', output_dir='results', progr
     run_id = str(uuid.uuid4())[:8]
     
     # Initialize model early to check if it loads correctly
+    def initialize_model():
+        try:
+            logger.info("Initializing sentence transformer model")
+            model_path = os.path.join(os.path.dirname(__file__), 'models', 'paraphrase-albert-small-v2')
+            
+            if os.path.exists(model_path):
+                logger.info(f"Loading model from local path: {model_path}")
+                model = SentenceTransformer(model_path)
+            else:
+                logger.info("Downloading model and saving to local path")
+                os.makedirs(model_path, exist_ok=True)
+                model = SentenceTransformer('paraphrase-albert-small-v2', cache_folder=model_path)
+                
+            logger.info("Model initialized successfully")
+            return model
+        except Exception as e:
+            logger.error(f"Error initializing model: {str(e)}")
+            raise
+    
+    # در تابع run_analysis، جایگزین کردن خط مربوط به model:
     try:
-        logger.info("Initializing sentence transformer model")
-        model = SentenceTransformer('paraphrase-MiniLM-L3-v2') #paraphrase-multilingual-MiniLM-L12-v2
-        # model = SentenceTransformer('paraphrase-MiniLM-L3-v2', 
-        #                         device='cpu',
-        #                         cache_folder='/tmp/models')
+        model = initialize_model()
         logger.info("Model initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing model: {str(e)}")
@@ -319,12 +335,5 @@ if __name__ == "__main__":
                       choices=['sum', 'mean', 'max'],
                       help="Similarity calculation method (sum/mean/max)")
     args = parser.parse_args()
-    
-    # os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
-    # os.environ['HF_HUB_DOWNLOAD_TIMEOUT'] = '600'  # 10 دقیقه
-
-    # model = SentenceTransformer('paraphrase-MiniLM-L3-v2', 
-    #                         device='cpu',
-    #                         cache_folder='/tmp/models')
 
     main(method=args.method)
