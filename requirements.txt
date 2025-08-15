@@ -3,11 +3,8 @@ werkzeug==2.0.1
 numpy==1.23.5
 pandas
 scikit-learn==1.5.1
-sentence-transformers==4.1.0
 seaborn==0.13.2
 matplotlib==3.9.2
 scholarly==1.7.11
 joblib==1.4.2
-transformers==4.51.3
 gunicorn==20.1.0
-hf_xet
