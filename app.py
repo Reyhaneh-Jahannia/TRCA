@@ -1,15 +1,3 @@
-import subprocess
-import sys
-
-# پکیج‌هایی که نمی‌خوایم تو requirements باشن ولی نیاز داریم
-packages = ["sentence-transformers", "transformers", "hf_xet"]
-
-for pkg in packages:
-    try:
-        __import__(pkg.replace("-", "_"))
-    except ImportError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
-
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 import os
 import json
