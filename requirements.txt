@@ -1,6 +1,6 @@
 flask==2.0.1
 werkzeug==2.0.1
-numpy==1.23.5
+numpy==1.24.0
 pandas
 scikit-learn==1.5.1
 sentence-transformers==4.1.0
