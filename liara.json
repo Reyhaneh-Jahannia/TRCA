@@ -1,6 +1,8 @@
 {
   "app": "trcaapp",
   "port": 0000,
+  "platform": "python",
+  "version": "3.12",
   "build": {
     "location": "iran"
   },
