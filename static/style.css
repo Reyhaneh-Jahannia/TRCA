@@ -1,0 +1,21 @@
+body {
+    font-family: 'Tahoma', 'Arial', sans-serif;
+    background-color: #f5f5f5;
+}
+
+.card {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+}
+
+h1, h2, h3 {
+    color: #343a40;
+}
+
+.alert {
+    margin-bottom: 20px;
+}
